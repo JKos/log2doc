@@ -21,7 +21,8 @@ defineObject{
 			class = "Party",
 			onDrawGui = function(party,g)
 				champions.script.gui(g)
-			end
+
+			end,
 		},
 	},
 }

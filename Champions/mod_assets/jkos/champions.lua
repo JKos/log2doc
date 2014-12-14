@@ -50,6 +50,14 @@ end
 
 function defineChampion(def)
 	champions[def.name] = def
+	if def.items == nil then
+		return
+	end
+	self.go:createComponent('ContainerItem','items_'..def.name)
+	local items = self.go:getComponent('items_'..def.name)
+	for _,item in ipairs(def.items) do
+		items:addItem(spawn(item).item)
+	end
 end
 
 function loadChampion(name,replaceChamp)
@@ -75,8 +83,35 @@ function loadChampion(name,replaceChamp)
 	setSkillLevels(replaceChamp,data.skillLevels)
 	replaceChamp:setSkillPoints(data.skillPoints)
 	setTraits(replaceChamp,data.traits)	
+	
+	if data.items then
+		local container = spawn('wooden_box')
+		for _,itemName in ipairs(data.items) do
+			local item = spawn(itemName)
+			container.containeritem:addItem(item.item)
+		end
+		setMouseItem(container.item)
+	end
+	
 	hudPrint('') hudPrint('') hudPrint('') hudPrint('') 
 	hudPrint(name..' joined to your party.')
+	if data.onRecruit then
+		data.onRecruit(data)
+	end
+end
+
+function getItems(champ)
+	local items = self.go:getComponent('items_'..champ.name)
+	if items == nil then return {} end
+	local capacity = items:getCapacity()
+	local result = {}
+	for i=1,capacity do
+		local item = items:getItem(i)
+		if item then
+			result[#result+1] = item
+		end
+	end
+	return result
 end
 
 
@@ -177,7 +212,7 @@ end
 dragStartedAt = nil
 function guiDragBar(g)
 	if g.mouseDown(0) then
-		if dragStartedAt == nil and guiMouseInRec(g,guiX-25,guiY-25,500,40) then
+		if dragStartedAt == nil and guiMouseInRec(g,guiX+235,guiY-25,380,50) then
 			dragStartedAt = {g.mouseX-guiX,g.mouseY-guiY}
 		end
 		if dragStartedAt then
@@ -193,6 +228,28 @@ function guiDragBar(g)
 	end
 end
 
+function drawGfxAtlas(g)
+	g.drawImage('assets/textures/gui/items_3.tga',0,0)
+end
+
+function drawItem(g,item,x,y)
+--GraphicsContext.drawImage2(image, x, y, srcX, srcY, srcWidth, srcHeight, destWidth, destHeight)
+	local index = item:getGfxIndex()
+	local atlasNumber = math.ceil(index/169)
+	if index >= 200 then 
+		index = index - 200 * (atlasNumber -  1)
+	end
+	local atlasIndex = index%169
+	local row = math.floor(atlasIndex/13)
+	local col = atlasIndex%13	
+	local atlas = 'assets/textures/gui/items.tga'
+	if atlasNumber > 1 then
+		atlas = 'assets/textures/gui/items_'..atlasNumber..'.tga'
+	end
+	g.drawImage2(atlas, x, y, col*75, row*75, 75,75, 50, 50)
+
+end
+
 guiX = 100
 guiY = 200
 guiW = 150
@@ -202,14 +259,17 @@ function gui(g)
 	if guiEnabled == false then return end
 	guiDragBar(g)
 	-- spacing,x,y,height,dummy
+	--drawGfxAtlas(g)
 	local s,x,y,h,_ = 5,guiX,guiY,0,0
-	g.drawImage('mod_assets/jkos/Dialog.tga',guiX-25,guiY-25)
-	g.drawImage('mod_assets/jkos/PortraitSlot.tga',guiX, guiY+30)	
+	--g.drawImage('mod_assets/jkos/Dialog.tga',guiX-25,guiY-25)
+	--g.drawImage('mod_assets/jkos/PortraitSlot.tga',guiX, guiY+30)	
+	g.drawImage('mod_assets/jkos/Recruit.tga',guiX-25,guiY-25)
 	g.font('large')
-	_,h = guiText(g,'Recruit champion',x,y,200)
+	_,h = guiText(g,'Recruit champion',x+300,y-5,200)
+	_,h = guiText(g,'Items',x+600,y+55,200)
 	g.font('small')
-	_,h = guiOption(g,'Close',x+400,y,60)
-	if g.button('recruit', x+400,y, 60, h+s) then
+	_,h = guiOption(g,'Close',x+770,y+50,60)
+	if g.button('close', x+770,y+50,60, h+s) then
 		guiEnabled = false
 	end
 	if guiState == 2 then
@@ -217,7 +277,7 @@ function gui(g)
 		return
 	end
 	guiDrawInfo(g,'Click a name to recruit')
-	y = y+180
+	y = y+260
 	local removeChamp = false
 	for name,champ in pairs(champions) do
 		_,h = guiOption(g,name,x,y,guiW)
@@ -251,9 +311,12 @@ function formatText(text)
 end
 
 function guiShowChampion(g,champ)
-	local y = guiY + 30
+	local y = guiY + 260
 	local width = 250
-	g.drawImage(champ.portrait, guiX+8, guiY+30+9)
+	g.drawImage(champ.portrait, guiX+10, guiY+70)
+	if champ.description then
+		guiText(g,champ.description,guiX+150,guiY+60,300)
+	end
 	_,h,y = guiText(g,
 		formatText(champ.race)..' '
 		..formatText(champ.sex)..' '
@@ -267,16 +330,25 @@ function guiShowChampion(g,champ)
 	for skill,level in pairs(champ.skillLevels) do
 		_,h,y = guiText(g, formatText(skill)..': '..level,guiX+guiW,y,width)
 	end
-
+	local items = getItems(champ)
+	local iy = guiY+100
+	for _,item in ipairs(items) do
+		drawItem(g,item,guiX+520,iy)
+		_,h,iy = guiText(g,item:getUiName(),guiX+590,iy+10,200)
+		iy = iy + 10
+	end
+	if champ.onDrawStats then
+		champ.onDrawStats(champ,g)
+	end
 end
 
 function guiDrawInfo(g,info)
-	_,h = guiText(g,'('..info..')',guiX+160, guiY+330,190)
+	_,h = guiText(g,'('..info..')',guiX+160, guiY+580,190)
 end
 
 function guiChampionSelected(g)
 	guiShowChampion(g,champions[selectedChampion])
-	local s,x,y,h = 5,guiX, guiY+180,0
+	local s,x,y,h = 5,guiX, guiY+260,0
 	for i=1,4 do
 		local name = party.party:getChampion(i):getName()
 		_,h = guiOption(g,name,x, y,150)
@@ -288,8 +360,8 @@ function guiChampionSelected(g)
 		y = y + h + s
 	end	
 	guiDrawInfo(g,'Who will have to go?')
-	_,h = guiOption(g,'Cancel',x+150+200, guiY+330,100)
-	if g.button('recruit', x+150+200, guiY+330, 100, h+s) then
+	_,h = guiOption(g,'Cancel',x, y,100)
+	if g.button('recruit', x, y, 100, h+s) then
 		guiState = 1
 	end
 end

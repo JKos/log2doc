@@ -62,9 +62,11 @@ script_entity_1.script:setSource("\
 function recruit()\
 \9champions.script.showGui(true)\
 end\
+function closeGui()\
+\9champions.script.showGui(false)\
+end\
 \
 function defineChampions()\
-\
    champions.script.defineChampion{\
       name = 'Lab Rat',\
       race = 'ratling',\
@@ -89,7 +91,10 @@ function defineChampions()\
       skillPoints=0,\
       traits={\
          human=true,\
-      }\
+      },\
+\9  description = \"This is the decription of the champion, just testing how much text can be typed here.\"\
+\9\9\9..\"This is the decription of the champion, just testing how much text can be typed here.\"\
+\9\9\9..\"This is the decription of the champion, just testing how much text can be typed here.\"\
    }\
 \
    champions.script.defineChampion{\
@@ -116,7 +121,16 @@ function defineChampions()\
       skillPoints=0,\
       traits={\
          human=true,\
-      }\
+      },\
+\9  items={\
+\9     'dagger',\
+\9     'potion_healing',\
+\9     'bear_pelt',\
+\9\9 'archmage_hat',\
+\9\9 'archmage_loafers',\
+\9\9 'archmage_mantle'\
+\9  },\
+\9  description = \"Added champion description and support for items. When you recruit the champion, his/her's items will be spawned in a wooden box which is then set as the mouseItem\"\
    }\
    champions.script.defineChampion{\
       name = 'Minotaur With really long name',\
@@ -124,7 +138,7 @@ function defineChampions()\
       class = 'barbarian',\
       sex='male',\
       portrait='assets/textures/portraits/minotaur_male_02.tga',\
-      experience=6000,\
+      experience=11000,\
       baseStats = {\
          strength=25,\
          dexterity=10,\
@@ -133,20 +147,37 @@ function defineChampions()\
       },\
       skillLevels = {\
          accuracy=1,\
-         light_weapons=4\
+         light_weapons=4,\
+\9\9 armors=4\
       },\
       energy=110,\
       food=1000,\
       health=100,\
-      level=4,\
+      level=5,\
       skillPoints=0,\
       traits={\
          human=true,\
-      }\
+      },\
+\9  items={\
+\9     'ax',\
+\9     'potion_healing',\
+\9     'bane'\
+\9  },\
+\9  onDrawStats = function(self,g)\
+\9\9--you can draw your own stuff here\
+\9  end,\
+\9  onRecruit = function(self)\
+\9\9\9hudPrint('This will be printed when champion is recruited')\
+\9  end\
    }\
 \
 \9\
 end\
 defineChampions()")
-spawn("script_entity",6,5,2,0,"jkos_gui")
-jkos_gui.script:loadFile("mod_assets/jkos/gui.lua")
+spawn("floor_trigger",16,15,1,0,"floor_trigger_1")
+floor_trigger_1.floortrigger:setTriggeredByParty(true)
+floor_trigger_1.floortrigger:setTriggeredByMonster(false)
+floor_trigger_1.floortrigger:setTriggeredByItem(false)
+floor_trigger_1.floortrigger:setTriggeredByDigging(false)
+floor_trigger_1.floortrigger:setDisableSelf(false)
+floor_trigger_1.floortrigger:addConnector("onDeactivate", "script_entity_1", "closeGui")
