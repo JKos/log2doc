@@ -1,4 +1,4 @@
-champions = {}
+--champions = {}
 skills = { 
 	"accuracy","athletics", "armors", "critical", "dodge", "missile_weapons",
 	"throwing", "firearms", "light_weapons", "heavy_weapons", "concentration", "alchemy",
@@ -21,9 +21,30 @@ traits = {
 	"earth_mastery","water_mastery","leadership","nightstalker"
 }
 
-
+storeId = ''
+function setStore(scriptId)
+	storeId = scriptId
+	local store = findEntity(storeId)
+	if not store then return false end
+	for name,champ in pairs(getChampions()) do
+		spawnChampionItems(champ)
+	end
+end
+function getChampions()
+	local store = findEntity(storeId)
+	if not store then return {} end
+	return store.script.championDefs
+end
+function hasChampions()
+	local champions = getChampions()
+	for _,champ in pairs(champions) do
+		return true
+	end
+	return false
+end
 
 function storeChampion(champ)
+	local champions = getChampions()
 	champions[champ:getName()] ={
 		baseStats = getBaseStats(champ),
 		class = champ:getClass(),
@@ -48,11 +69,10 @@ function storeChampion(champ)
 	}
 end
 
-function defineChampion(def)
-	champions[def.name] = def
-	if def.items == nil then
-		return
-	end
+function spawnChampionItems(def)
+	if not def.items then return end
+	local items = self.go:getComponent('items_'..def.name)
+	if items then return end -- already spawned
 	self.go:createComponent('ContainerItem','items_'..def.name)
 	local items = self.go:getComponent('items_'..def.name)
 	for _,item in ipairs(def.items) do
@@ -61,6 +81,7 @@ function defineChampion(def)
 end
 
 function loadChampion(name,replaceChamp)
+	local champions = getChampions()
 	local data = champions[name]
 	replaceChamp:setEnabled(true)
 	replaceChamp:setName(data.name) 
@@ -91,6 +112,7 @@ function loadChampion(name,replaceChamp)
 			container.containeritem:addItem(item.item)
 		end
 		setMouseItem(container.item)
+		self.go:removeComponent('items_'..data.name)
 	end
 	
 	hudPrint('') hudPrint('') hudPrint('') hudPrint('') 
@@ -184,11 +206,19 @@ end
 
 -- GUI RELATED STUFF
 guiEnabled = false
+guiX = 100
+guiY = 200
+guiW = 150
+guiState = 1
+selectedChampion = nil
+
+
 function showGui(bool)
 	guiState = 1
 	selectedChampion = nil
 	guiEnabled = bool
 end
+
 function guiOption(g,text,x,y,w)
 	_,h = g.drawParagraph(text,x+7,y+19,w)
 	if guiMouseInRec(g,x,y,w,h+4) then
@@ -250,13 +280,10 @@ function drawItem(g,item,x,y)
 
 end
 
-guiX = 100
-guiY = 200
-guiW = 150
-guiState = 1
-selectedChampion = nil
+
 function gui(g)
 	if guiEnabled == false then return end
+	local champions = getChampions()
 	guiDragBar(g)
 	-- spacing,x,y,height,dummy
 	--drawGfxAtlas(g)
@@ -347,6 +374,7 @@ function guiDrawInfo(g,info)
 end
 
 function guiChampionSelected(g)
+	local champions = getChampions()
 	guiShowChampion(g,champions[selectedChampion])
 	local s,x,y,h = 5,guiX, guiY+260,0
 	for i=1,4 do
