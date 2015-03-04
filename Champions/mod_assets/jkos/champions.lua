@@ -1,4 +1,6 @@
 --champions = {}
+
+
 skills = { 
 	"accuracy","athletics", "armors", "critical", "dodge", "missile_weapons",
 	"throwing", "firearms", "light_weapons", "heavy_weapons", "concentration", "alchemy",
@@ -22,6 +24,11 @@ traits = {
 }
 
 storeId = ''
+
+function onDrawGui(party,g)
+	champions.script.gui(g)
+end
+
 function setStore(scriptId)
 	storeId = scriptId
 	local store = findEntity(storeId)
@@ -42,7 +49,7 @@ function hasChampions()
 	end
 	return false
 end
-
+-- can be used to store a champion from the party in to the active store
 function storeChampion(champ)
 	local champions = getChampions()
 	champions[champ:getName()] ={
@@ -80,6 +87,7 @@ function spawnChampionItems(def)
 	end
 end
 
+-- load champion from active store
 function loadChampion(name,replaceChamp)
 	local champions = getChampions()
 	local data = champions[name]
@@ -98,8 +106,8 @@ function loadChampion(name,replaceChamp)
 	if data.portrait then
 		replaceChamp:setPortrait(data.portrait)
 	end 	
-	local toTargetXp = data.experience - replaceChamp:getExp()
-	replaceChamp:gainExp(toTargetXp)
+	replaceChamp:resetExp()
+	replaceChamp:gainExp(data.experience)
 
 	setSkillLevels(replaceChamp,data.skillLevels)
 	replaceChamp:setSkillPoints(data.skillPoints)
@@ -214,9 +222,18 @@ selectedChampion = nil
 
 
 function showGui(bool)
+	if bool == guiEnabled then return end
 	guiState = 1
 	selectedChampion = nil
 	guiEnabled = bool
+	GameMode.setGameFlag('DisableMovement', bool)
+	GameMode.setGameFlag('DisableMouseLook', bool)
+	GameMode.setGameFlag('DisableMonsterAI', bool)
+	if bool then
+		party.party:addConnector('onDrawGui',self.go.id,'onDrawGui')
+	else
+		party.party:removeConnector('onDrawGui',self.go.id,'onDrawGui')
+	end
 end
 
 function guiOption(g,text,x,y,w)
@@ -231,7 +248,7 @@ end
 
 function guiText(g,text,x,y,w)
 	local rw,h = g.drawParagraph(text,x+5,y+17,w)
-	return rw,h+8,y-2+h+8
+	return rw,h+2,y-2+h+2
 end
 
 function guiMouseInRec(g, bx, by, bw, bh)
@@ -297,7 +314,7 @@ function gui(g)
 	g.font('small')
 	_,h = guiOption(g,'Close',x+770,y+50,60)
 	if g.button('close', x+770,y+50,60, h+s) then
-		guiEnabled = false
+		showGui(false)
 	end
 	if guiState == 2 then
 		guiChampionSelected(g)
@@ -317,7 +334,7 @@ function gui(g)
 			if freeSlot then
 				loadChampion(name,freeSlot)
 				removeChamp = name
-				guiEnabled = false
+				showGui(false)
 			else
 				guiState = 2
 				selectedChampion = name
@@ -357,6 +374,9 @@ function guiShowChampion(g,champ)
 	for skill,level in pairs(champ.skillLevels) do
 		_,h,y = guiText(g, formatText(skill)..': '..level,guiX+guiW,y,width)
 	end
+	for trait,_ in pairs(champ.traits) do
+		_,h,y = guiText(g,'Trait: '.. formatText(trait),guiX+guiW,y,width)
+	end
 	local items = getItems(champ)
 	local iy = guiY+100
 	for _,item in ipairs(items) do
@@ -370,7 +390,10 @@ function guiShowChampion(g,champ)
 end
 
 function guiDrawInfo(g,info)
-	_,h = guiText(g,'('..info..')',guiX+160, guiY+580,190)
+	local location = g.getTextWidth(info)/2
+	g.font('tiny')
+	guiText(g,'('..info..')',guiX+245-location, guiY+570,500)
+	g.font('small')
 end
 
 function guiChampionSelected(g)
@@ -383,16 +406,28 @@ function guiChampionSelected(g)
 		if g.button('recruit', x, y, 150, h+s) then
 			loadChampion(selectedChampion,party.party:getChampion(i))
 			champions[selectedChampion] = nil
-			guiEnabled = false
+			showGui(false)
 		end
 		y = y + h + s
 	end	
-	guiDrawInfo(g,'Who will have to go?')
-	_,h = guiOption(g,'Cancel',x, y,100)
-	if g.button('recruit', x, y, 100, h+s) then
+	guiDrawInfo(g,'Who will have to go? The replaced champion will be gone forever.')
+	if guiButtonCancel(g,x,y) then
 		guiState = 1
 	end
 end
 
+function confirmRecruit()
+	drawButtonCancel(g,x,y)
+end
 
-
+function guiButtonCancel(g,x,y)
+	if guiMouseInRec(g,x,y,100,30) then
+		g.drawGuiItem('ButtonCancelHover', x, y)
+	else
+		g.drawGuiItem('ButtonCancel', x, y)
+	end
+	if g.button('cancel', x, y, 100, 30) then
+		return true
+	end
+	return false
+end
